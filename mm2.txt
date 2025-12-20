@@ -153,7 +153,7 @@ content.BackgroundTransparency = 1
 
 -- ============= STEP 6: 5 TABS (SCROLLABLE) =============
 local tabs = {}
-local tabNames = {"FARM", "ESP", "PLAYER", "TP", "MISC"}
+local tabNames = {"FARM", "ESP", "PLAYER", "TP", "COMBAT", "MISC"}
 
 for i, name in ipairs(tabNames) do
     local tab = {}
@@ -248,6 +248,60 @@ function removeEsp()
         if obj.billboard then obj.billboard:Destroy() end
     end
     espObjects = {}
+end
+
+-- ============= STEP 7.5: FLING SYSTEM (COMBAT) =============
+local flingVars = {
+    isFlinging = false,
+    flingTarget = nil,
+    flingPower = 50,
+    flingConnection = nil
+}
+
+local function startFling(targetChar)
+    if flingVars.flingConnection then
+        flingVars.flingConnection:Disconnect()
+    end
+    
+    flingVars.flingTarget = targetChar
+    flingVars.isFlinging = true
+    
+    -- Karakterin çarpışmasını aç
+    for _, part in ipairs(Char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+    
+    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
+        if flingVars.isFlinging and flingVars.flingTarget and flingVars.flingTarget:FindFirstChild("HumanoidRootPart") and HRP then
+            HRP.CFrame = flingVars.flingTarget.HumanoidRootPart.CFrame
+            HRP.Velocity = Vector3.new(
+                math.random(-flingVars.flingPower, flingVars.flingPower),
+                math.random(-flingVars.flingPower, flingVars.flingPower),
+                math.random(-flingVars.flingPower, flingVars.flingPower)
+            )
+        end
+    end)
+end
+
+local function stopFling()
+    flingVars.isFlinging = false
+    flingVars.flingTarget = nil
+    if flingVars.flingConnection then
+        flingVars.flingConnection:Disconnect()
+        flingVars.flingConnection = nil
+    end
+    notify("Fling", "Stopped")
+end
+
+local function getPlayerByName(name)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():sub(1, #name:lower()) == name:lower() and player ~= Plr then
+            return player
+        end
+    end
+    return nil
 end
 
 -- ============= STEP 8: ELEMENT FACTORIES =============
@@ -565,6 +619,103 @@ addButton(tabs[4], "TP to Lobby", function()
         notify("Error", "No lobby found")
     end
 end)
+
+-- **COMBAT** (4 temel + 1 durdurma butonu)
+local flingTargetName = ""
+
+addDropdown(tabs[6], "Target Player", 
+    (function()
+        local list = {}
+        for _, p in pairs(Players:GetPlayers()) do if p ~= Plr then table.insert(list, p.Name) end end
+        return #list > 0 and list or {"None"}
+    end)(),
+    function(val)
+        flingTargetName = val
+    end)
+
+addSlider(tabs[6], "Fling Powrr", 10, 200, 50, function(val)
+    flingVars.flingPower = val
+    notify("Fling Power", "Has been set: " .. val)
+end)
+
+addButton(tabs[6], "Fling Player", function()
+    if flingTargetName and flingTargetName ~= "None" then
+        local target = getPlayerByName(flingTargetName)
+        if target and target.Character then
+            stopFling()
+            startFling(target.Character)
+            notify("Fling", "Has been started: "..target.Name)
+        else
+            notify("Error", "Target couldn't been found")
+        end
+    else
+        notify("Error", "The player isn't selected")
+    end
+end)
+
+addButton(tabs[6], "Fling Murderer", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                stopFling()
+                startFling(p.Character)
+                notify("Fling", "Murderer getting flung: "..p.Name)
+                return
+            end
+        end
+    end
+    notify("Couldn't been found", "No Murderer")
+end)
+
+addButton(tabs[6], "Fling Sheriff", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                stopFling()
+                startFling(p.Character)
+                notify("Fling", "Sheriff flingleniyor: "..p.Name)
+                 notify("Fling", "Sheriff gettig flung: "..p.Name)ify("Bulunamadı", "Sheriff yok")
+end)
+
+addButton(tabs[6], "F    notify("Couldn't been found", "No Sheriff")   local flingList = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(flingList, p.Character)
+        end
+    end
+    
+    if #flingList == 0 then
+        notify("Hata", "Flinglenecek oyuncu yok")
+        return
+    end
+    
+    flingVars.isFlinging = true
+    local index = 1
+    
+    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
+        if not flingVars.isFlinging or #flingList == 0 then return end
+        
+        local targetChar = flingList[index]
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") and HRP then
+            HRP.CFrame = targetChar.HumanoidRootPart.CFrame
+            HRP.Velocity = Vector3.new(
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2)
+            )
+        end
+        
+        index = index % #flingList + 1
+    end)
+    
+    notify("Fling All", #flingList .. " player getting flung!")
+end)
+
+addButton(tabs[6], "Stop Fling", function()
+    stopFling()
+end)
+
+addLabel(tabs[6], "Situation : Waiting")
 
 -- **SETTINGS** (5 elements)
 addButton(tabs[5], "Rejoin Server", function()
