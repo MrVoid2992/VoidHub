@@ -25,7 +25,7 @@ local CONFIG = {
     AFK_ENABLED = true,
     MAX_SPEED = 50,
     UI_OPEN = true,
-    TP_DISTANCE = 150
+    TP_DISTANCE = 75
 }
 
 -- ============= STEP 3: MOBILE TOGGLE BUTTON (VISIBLE WHEN GUI CLOSED) =============
