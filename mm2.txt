@@ -17,7 +17,7 @@ local HRP = Char:WaitForChild("HumanoidRootPart")
 local Hum = Char:WaitForChild("Humanoid")
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
--- ============= STEP 2: CONFIGURATION & NEW STATES =============
+-- ============= STEP 2: CONFIGURATION =============
 local CONFIG = {
     COIN_TYPE = "SnowToken",
     AUTO_FARM = false,
@@ -25,14 +25,10 @@ local CONFIG = {
     AFK_ENABLED = true,
     MAX_SPEED = 50,
     UI_OPEN = true,
-    -- NEW COMBAT STATES
-    AUTO_GRAB_GUN = false,
-    AUTO_KILL_MURDERER = false
+    TP_DISTANCE = 150
 }
 
-local bag_full = false  -- Global state for bag full
-
--- ============= STEP 3: MOBILE TOGGLE BUTTON =============
+-- ============= STEP 3: MOBILE TOGGLE BUTTON (VISIBLE WHEN GUI CLOSED) =============
 local mobileBtn = Instance.new("TextButton")
 mobileBtn.Name = "VOID_HUB_TOGGLE"
 mobileBtn.Size = UDim2.new(0, 60, 0, 60)
@@ -44,7 +40,7 @@ mobileBtn.TextColor3 = Color3.new(1, 1, 1)
 mobileBtn.TextScaled = true
 mobileBtn.Font = Enum.Font.GothamBold
 mobileBtn.ZIndex = 999
-mobileBtn.Visible = true -- Initially visible
+mobileBtn.Visible = true -- ✅ Initially visible
 mobileBtn.Parent = game.CoreGui
 
 Instance.new("UICorner", mobileBtn).CornerRadius = UDim.new(0, 30)
@@ -155,9 +151,9 @@ content.Size = UDim2.new(1, -90, 1, -30)
 content.Position = UDim2.new(0, 90, 0, 30)
 content.BackgroundTransparency = 1
 
--- ============= STEP 6: 6 TABS (SCROLLABLE) - NEW "COMBAT" ADDED =============
+-- ============= STEP 6: 5 TABS (SCROLLABLE) =============
 local tabs = {}
-local tabNames = {"FARM", "ESP", "PLAYER", "TP", "COMBAT", "MISC"}
+local tabNames = {"FARM", "ESP", "PLAYER", "TP", "MISC"}
 
 for i, name in ipairs(tabNames) do
     local tab = {}
@@ -200,94 +196,61 @@ for i, name in ipairs(tabNames) do
     end)
 end
 
--- ============= STEP 7: COMBAT REMOTES & FUNCTIONS =============
--- Find MM2 remotes
-local function getCombatRemotes()
-    local remotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay")
-    return {
-        FireGun = remotes:FindFirstChild("FireGun") or remotes:FindFirstChild("Shoot"),
-        PickupGun = remotes:FindFirstChild("PickupGun"),
-        Knife = remotes:FindFirstChild("Knife"),
-        DropGun = remotes:FindFirstChild("DropGun")
-    }
-end
+-- ============= STEP 7: ESP SYSTEM =============
+local espObjects = {}
 
-local combatRemotes = getCombatRemotes()
-local function hasGun()
-    return Plr.Backpack:FindFirstChild("Gun") or Plr.Character:FindFirstChild("Gun")
-end
-
-local function getSheriff()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
-            return p
-        end
-    end
-    return nil
-end
-
-local function getMurderer()
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
-            return p
-        end
-    end
-    return nil
-end
-
-local function grabGun()
-    -- Try to pick up gun from ground first
-    local gun = Workspace:FindFirstChild("Gun")
-    if gun and gun:FindFirstChild("Handle") then
-        HRP.CFrame = gun.Handle.CFrame
-        task.wait(0.2)
-    end
-    
-    -- If remote exists, fire it
-    if combatRemotes.PickupGun then
-        combatRemotes.PickupGun:FireServer()
-    end
-    notify("Combat", "Grabbed Gun")
-end
-
-local function killMurderer()
-    local murderer = getMurderer()
-    if murderer and murderer.Character and hasGun() then
-        local targetPos = murderer.Character:WaitForChild("HumanoidRootPart").Position
-        -- Fire gun remote if exists
-        if combatRemotes.FireGun then
-            combatRemotes.FireGun:FireServer(targetPos)
-        else
-            -- Fallback: TP to murderer and spam click
-            HRP.CFrame = murderer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5)
-            task.wait(0.1)
-            VirtualUser:ClickButton1(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
-        end
-        notify("Combat", "Killed Murderer: " .. murderer.Name)
-    else
-        notify("Combat", "No murderer or no gun")
-    end
-end
-
-local function killEveryone()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= Plr and player.Character then
-            local targetHum = player.Character:FindFirstChildOfClass("Humanoid")
-            if targetHum then
-                -- Try to damage directly (godmode bypass)
-                targetHum.Health = 0
-                -- If knife remote exists, use it
-                if combatRemotes.Knife then
-                    local targetPos = player.Character:WaitForChild("HumanoidRootPart").Position
-                    combatRemotes.Knife:FireServer(targetPos)
-                end
+function updateEsp()
+    for _, obj in pairs(espObjects) do
+        if obj.player and obj.player.Character and obj.highlight then
+            local color = Color3.fromRGB(0, 255, 0)
+            if obj.player.Backpack:FindFirstChild("Knife") or obj.player.Character:FindFirstChild("Knife") then
+                color = Color3.fromRGB(255, 0, 0)
+            elseif obj.player.Backpack:FindFirstChild("Gun") or obj.player.Character:FindFirstChild("Gun") then
+                color = Color3.fromRGB(0, 85, 255)
             end
+            obj.highlight.FillColor = color
         end
     end
-    notify("Combat", "Kill All executed")
 end
 
--- ============= STEP 8: ELEMENT FACTORIES (UNCHANGED) =============
+function createEsp()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Plr and player.Character and not player.Character:FindFirstChild("EspHighlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "EspHighlight"
+            highlight.Parent = player.Character
+            highlight.FillTransparency = 0.6
+            highlight.OutlineTransparency = 0.3
+            
+            local billboard = Instance.new("BillboardGui")
+            billboard.Parent = player.Character:WaitForChild("HumanoidRootPart")
+            billboard.Size = UDim2.new(0, 100, 0, 25)
+            billboard.AlwaysOnTop = true
+            billboard.MaxDistance = 500
+            
+            local text = Instance.new("TextLabel", billboard)
+            text.Size = UDim2.new(1, 0, 1, 0)
+            text.BackgroundTransparency = 0.5
+            text.BackgroundColor3 = Color3.new(0, 0, 0)
+            text.TextColor3 = Color3.new(1, 1, 1)
+            text.TextScaled = true
+            text.Text = player.Name
+            
+            table.insert(espObjects, {highlight = highlight, billboard = billboard, player = player})
+        end
+    end
+    updateEsp()
+end
+
+function removeEsp()
+    for _, obj in pairs(espObjects) do
+        if obj.highlight then obj.highlight:Destroy() end
+        if obj.billboard then obj.billboard:Destroy() end
+    end
+    espObjects = {}
+end
+
+-- ============= STEP 8: ELEMENT FACTORIES =============
 local function addToggle(tab, text, default, callback)
     local container = Instance.new("Frame", tab.Content)
     container.Size = UDim2.new(1, -10, 0, 30)
@@ -456,9 +419,9 @@ local function addLabel(tab, text)
     label.LayoutOrder = #tab.Content:GetChildren() * 10
 end
 
--- ============= STEP 9: POPULATE ALL 6 TABS =============
+-- ============= STEP 9: POPULATE ALL 5 TABS (UNCHANGED) =============
 
--- **FARM** (5 elements) - UNCHANGED
+-- **FARM** (5 elements)
 addToggle(tabs[1], "Auto Farm", false, function(state)
     CONFIG.AUTO_FARM = state
     farming = state
@@ -481,7 +444,7 @@ end)
 
 addLabel(tabs[1], "Collected: 0 | Max: " .. CONFIG.MAX_SPEED)
 
--- **ESP** (5 elements) - UNCHANGED
+-- **ESP** (5 elements)
 addToggle(tabs[2], "Show ESP", false, function(state)
     CONFIG.ESP_ENABLED = state
     if state then createEsp() else removeEsp() end
@@ -514,7 +477,7 @@ end)
 
 addLabel(tabs[2], "Players: " .. #Players:GetPlayers())
 
--- **PLAYER** (4 elements - FLY REMOVED) - UNCHANGED EXCEPT FLY
+-- **PLAYER** (5 elements - **FLY REMOVED**)
 addSlider(tabs[3], "WalkSpeed", 20, 200, Hum.WalkSpeed, function(val)
     Hum.WalkSpeed = val
     notify("Speed", "WalkSpeed: " .. val)
@@ -533,6 +496,7 @@ end)
 
 -- ✅ FIXED RESET BUTTON
 addButton(tabs[3], "Reset", function()
+    -- ✅ DÜZELTİLMİŞ RESET (GARANTİ ÇALIŞIR)
     local currentChar = Plr.Character
     if currentChar then
         local currentHum = currentChar:FindFirstChildOfClass("Humanoid")
@@ -543,7 +507,7 @@ addButton(tabs[3], "Reset", function()
     end
 end)
 
--- **TELEPORT** (5 elements) - UNCHANGED
+-- **TELEPORT** (5 elements)
 local selectedPlayer = nil
 
 addDropdown(tabs[4], "Target", 
@@ -602,58 +566,27 @@ addButton(tabs[4], "TP to Lobby", function()
     end
 end)
 
--- **COMBAT** (6 elements - NEW CATEGORY)
--- Auto Grab Gun
-addToggle(tabs[5], "Auto Grab Gun", false, function(state)
-    CONFIG.AUTO_GRAB_GUN = state
-    notify("Combat", "Auto Grab: " .. (state and "ON" or "OFF"))
-end)
-
--- Auto Kill Murderer
-addToggle(tabs[5], "Auto Kill Murderer", false, function(state)
-    CONFIG.AUTO_KILL_MURDERER = state
-    notify("Combat", "Auto Kill: " .. (state and "ON" or "OFF"))
-end)
-
--- Manual Grab Gun
-addButton(tabs[5], "Grab Gun (Manual)", function()
-    grabGun()
-end)
-
--- Manual Kill Murderer
-addButton(tabs[5], "Kill Murderer (Manual)", function()
-    killMurderer()
-end)
-
--- Manual Kill All
-addButton(tabs[5], "Kill All (Manual)", function()
-    killEveryone()
-end)
-
--- Status Label
-addLabel(tabs[5], "Auto features activate when bag is full\nManual buttons work anytime")
-
--- **SETTINGS** (5 elements) - UNCHANGED
-addButton(tabs[6], "Rejoin Server", function()
+-- **SETTINGS** (5 elements)
+addButton(tabs[5], "Rejoin Server", function()
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
 end)
 
-addButton(tabs[6], "Copy Job ID", function()
+addButton(tabs[5], "Copy Job ID", function()
     setclipboard(game.JobId)
     notify("Copied", "Job ID copied")
 end)
 
-addButton(tabs[6], "Copy TP Code", function()
+addButton(tabs[5], "Copy TP Code", function()
     setclipboard('game:GetService("TeleportService"):TeleportToPlaceInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '", game.Players.LocalPlayer)')
     notify("Copied", "TP Code")
 end)
 
-addToggle(tabs[6], "Anti-AFK", true, function(state)
+addToggle(tabs[5], "Anti-AFK", true, function(state)
     CONFIG.AFK_ENABLED = state
     notify("AFK", state and "ON" or "OFF")
 end)
 
-addLabel(tabs[6], "Speed: " .. CONFIG.MAX_SPEED .. " | Mobile: " .. tostring(isMobile) .. "\nDrag from top bar")
+addLabel(tabs[5], "Speed: " .. CONFIG.MAX_SPEED .. " | Mobile: " .. tostring(isMobile) .. "\nDrag from top bar")
 
 -- ============= STEP 10: DRAGGING SYSTEM =============
 local isDragging = false
@@ -696,32 +629,16 @@ mobileBtn.MouseButton1Click:Connect(function()
     CONFIG.UI_OPEN = main.Visible
 end)
 
--- ============= STEP 12: GAME LOGIC (ENHANCED WITH COMBAT) =============
+-- ============= STEP 12: GAME LOGIC =============
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local Gameplay = Remotes:WaitForChild("Gameplay")
 local CoinCollected = Gameplay:WaitForChild("CoinCollected")
-local RoundStart = Gameplay:WaitForChild("RoundStart")
-local RoundEndFade = Gameplay:WaitForChild("RoundEndFade")
 
 Plr.Idled:Connect(function()
     if CONFIG.AFK_ENABLED then
         VirtualUser:CaptureController()
         VirtualUser:ClickButton2(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
     end
-end)
-
--- ✅ FIXED: Round events properly connected
-RoundStart.OnClientEvent:Connect(function()
-    farming = false -- Reset farming at round start
-    bag_full = false -- Reset bag full
-    if CONFIG.AUTO_FARM then
-        farming = true
-        startPos = HRP.CFrame
-    end
-end)
-
-RoundEndFade.OnClientEvent:Connect(function()
-    farming = false
 end)
 
 CoinCollected.OnClientEvent:Connect(function(coin_type, current, max)
@@ -742,37 +659,7 @@ Plr.CharacterAdded:Connect(function(newChar)
     Hum = newChar:WaitForChild("Humanoid")
 end)
 
--- ============= STEP 13: COMBAT AUTO-ACTIVATION LOOP =============
-task.spawn(function()
-    while true do
-        task.wait(0.5) -- Check every 0.5 seconds
-        
-        -- Auto Grab Gun (when bag is full)
-        if CONFIG.AUTO_GRAB_GUN and bag_full then
-            local sheriff = getSheriff()
-            if sheriff and not hasGun() then
-                -- Check if sheriff died
-                local sheriffHum = sheriff.Character and sheriff.Character:FindFirstChildOfClass("Humanoid")
-                if sheriffHum and sheriffHum.Health <= 0 then
-                    grabGun()
-                end
-            end
-        end
-        
-        -- Auto Kill Murderer (when bag is full)
-        if CONFIG.AUTO_KILL_MURDERER and bag_full then
-            local murderer = getMurderer()
-            if murderer and murderer.Character and hasGun() then
-                local murdererHum = murderer.Character:FindFirstChildOfClass("Humanoid")
-                if murdererHum and murdererHum.Health > 0 then
-                    killMurderer()
-                end
-            end
-        end
-    end
-end)
-
--- ============= STEP 14: FARM LOOP (ROBUST) =============
+-- ============= STEP 13: FARM LOOP (ROBUST) =============
 local farming = false
 local bag_full = false
 local startPos = HRP.CFrame
@@ -838,7 +725,7 @@ task.spawn(function()
     end
 end)
 
--- ============= STEP 15: ESP LOOP =============
+-- ============= STEP 14: ESP LOOP =============
 task.spawn(function()
     while true do
         if CONFIG.ESP_ENABLED then
@@ -848,6 +735,6 @@ task.spawn(function()
     end
 end)
 
--- ============= STEP 16: INITIALIZATION =============
-notify("✅ LOADED", "Combat Added: Grab Gun & Kill | Speed: 50 | Auto activates on bag full", 4)
-print(string.format("✅ VOID HUB ~ MM2 v4.0 | Combat Added | Speed: %d | FINAL VERSION", CONFIG.MAX_SPEED))
+-- ============= STEP 15: INITIALIZATION =============
+notify("✅ LOADED", "Fixed: Reset, AutoFarm | Removed: Fly | Speed: 50", 3)
+print(string.format("✅ VOID HUB ~ MM2 v3.0 | Speed: %d | FIXED VERSION", CONFIG.MAX_SPEED))
