@@ -151,9 +151,10 @@ content.Size = UDim2.new(1, -90, 1, -30)
 content.Position = UDim2.new(0, 90, 0, 30)
 content.BackgroundTransparency = 1
 
--- ============= STEP 6: 5 TABS (SCROLLABLE) =============
+-- ============= STEP 6: 6 TABS (SCROLLABLE) =============
 local tabs = {}
-local tabNames = {"FARM", "ESP", "PLAYER", "TP", "COMBAT", "MISC"}
+local tabNames = {"FARM", "ESP", "PLAYER", "TP", "COMBAT", "SETTINGS"}
+
 
 for i, name in ipairs(tabNames) do
     local tab = {}
@@ -620,10 +621,10 @@ addButton(tabs[4], "TP to Lobby", function()
     end
 end)
 
--- **COMBAT** (4 temel + 1 durdurma butonu)
+-- **COMBAT** (6 elements - FIXED)
 local flingTargetName = ""
 
-addDropdown(tabs[6], "Target Player", 
+addDropdown(tabs[5], "Target Player", 
     (function()
         local list = {}
         for _, p in pairs(Players:GetPlayers()) do if p ~= Plr then table.insert(list, p.Name) end end
@@ -633,51 +634,57 @@ addDropdown(tabs[6], "Target Player",
         flingTargetName = val
     end)
 
-addSlider(tabs[6], "Fling Powrr", 10, 200, 50, function(val)
+addSlider(tabs[5], "Fling Power", 10, 200, 50, function(val)
     flingVars.flingPower = val
-    notify("Fling Power", "Has been set: " .. val)
+    notify("Fling Power", "Set to: " .. val)
 end)
 
-addButton(tabs[6], "Fling Player", function()
+addButton(tabs[5], "Fling Player", function()
     if flingTargetName and flingTargetName ~= "None" then
         local target = getPlayerByName(flingTargetName)
         if target and target.Character then
             stopFling()
             startFling(target.Character)
-            notify("Fling", "Has been started: "..target.Name)
+            notify("Fling", "Started: "..target.Name)
         else
-            notify("Error", "Target couldn't been found")
+            notify("Error", "Target not found")
         end
     else
-        notify("Error", "The player isn't selected")
+        notify("Error", "No player selected")
     end
 end)
 
-addButton(tabs[6], "Fling Murderer", function()
+addButton(tabs[5], "Fling Murderer", function()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
             if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 stopFling()
                 startFling(p.Character)
-                notify("Fling", "Murderer getting flung: "..p.Name)
+                notify("Fling", "Flinging Murderer: "..p.Name)
                 return
             end
         end
     end
-    notify("Couldn't been found", "No Murderer")
+    notify("Not Found", "No Murderer")
 end)
 
-addButton(tabs[6], "Fling Sheriff", function()
+addButton(tabs[5], "Fling Sheriff", function()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
             if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 stopFling()
                 startFling(p.Character)
-                notify("Fling", "Sheriff flingleniyor: "..p.Name)
-                 notify("Fling", "Sheriff gettig flung: "..p.Name)ify("Bulunamadı", "Sheriff yok")
+                notify("Fling", "Flinging Sheriff: "..p.Name)
+                return
+            end
+        end
+    end
+    notify("Not Found", "No Sheriff")
 end)
 
-addButton(tabs[6], "F    notify("Couldn't been found", "No Sheriff")   local flingList = {}
+addButton(tabs[5], "Fling All", function()
+    stopFling()
+    local flingList = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             table.insert(flingList, p.Character)
@@ -685,7 +692,7 @@ addButton(tabs[6], "F    notify("Couldn't been found", "No Sheriff")   local fli
     end
     
     if #flingList == 0 then
-        notify("Hata", "Flinglenecek oyuncu yok")
+        notify("Error", "No players to fling")
         return
     end
     
@@ -708,36 +715,37 @@ addButton(tabs[6], "F    notify("Couldn't been found", "No Sheriff")   local fli
         index = index % #flingList + 1
     end)
     
-    notify("Fling All", #flingList .. " player getting flung!")
+    notify("Fling All", "Flinging " .. #flingList .. " players!")
 end)
 
-addButton(tabs[6], "Stop Fling", function()
+addButton(tabs[5], "Stop Fling", function()
     stopFling()
 end)
 
-addLabel(tabs[6], "Situation : Waiting")
+addLabel(tabs[6], "Status: Idle")
+
 
 -- **SETTINGS** (5 elements)
-addButton(tabs[5], "Rejoin Server", function()
+addButton(tabs[6], "Rejoin Server", function()
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
 end)
 
-addButton(tabs[5], "Copy Job ID", function()
+addButton(tabs[6], "Copy Job ID", function()
     setclipboard(game.JobId)
     notify("Copied", "Job ID copied")
 end)
 
-addButton(tabs[5], "Copy TP Code", function()
+addButton(tabs[6], "Copy TP Code", function()
     setclipboard('game:GetService("TeleportService"):TeleportToPlaceInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '", game.Players.LocalPlayer)')
     notify("Copied", "TP Code")
 end)
 
-addToggle(tabs[5], "Anti-AFK", true, function(state)
+addToggle(tabs[6], "Anti-AFK", true, function(state)
     CONFIG.AFK_ENABLED = state
     notify("AFK", state and "ON" or "OFF")
 end)
 
-addLabel(tabs[5], "Speed: " .. CONFIG.MAX_SPEED .. " | Mobile: " .. tostring(isMobile) .. "\nDrag from top bar")
+addLabel(tabs[6], "Speed: " .. CONFIG.MAX_SPEED .. " | Mobile: " .. tostring(isMobile) .. "\nDrag from top bar")
 
 -- ============= STEP 10: DRAGGING SYSTEM =============
 local isDragging = false
