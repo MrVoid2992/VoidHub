@@ -808,7 +808,9 @@ Plr.CharacterAdded:Connect(function(newChar)
     Char = newChar
     HRP = newChar:WaitForChild("HumanoidRootPart")
     Hum = newChar:WaitForChild("Humanoid")
+    stopFling()
 end)
+
 
 -- ============= STEP 13: FARM LOOP (ROBUST) =============
 local farming = false
@@ -887,5 +889,5 @@ task.spawn(function()
 end)
 
 -- ============= STEP 15: INITIALIZATION =============
-notify("✅ LOADED", "Fixed: Reset, AutoFarm | Removed: Fly | Speed: 50", 3)
-print(string.format("✅ VOID HUB ~ MM2 v3.0 | Speed: %d | FIXED VERSION", CONFIG.MAX_SPEED))
+notify("✅ LOADED", "Combat category have been added! | Fling: Player/Murderer/Sheriff/All", 3)
+print(string.format("✅ VOID HUB ~ MM2 v4.0 | Combat: READY | Speed: %d", CONFIG.MAX_SPEED))
