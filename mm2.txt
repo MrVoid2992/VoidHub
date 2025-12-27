@@ -271,6 +271,7 @@ local function stopFling()
         flingVars.flingConnection = nil
     end
     
+    -- Restore character collisions
     if Char then
         for _, part in ipairs(Char:GetDescendants()) do
             if part:IsA("BasePart") and flingVars.originalCanCollide[part] ~= nil then
@@ -281,6 +282,7 @@ local function stopFling()
     
     flingVars.originalCanCollide = {}
     
+    -- Restore FallenPartsDestroyHeight
     if flingVars.FPDH then
         workspace.FallenPartsDestroyHeight = flingVars.FPDH
     end
@@ -288,7 +290,7 @@ local function stopFling()
     notify("Fling", "Stopped")
 end
 
-local function fling(TargetPlayer)
+local function fling(TargetPlayer, skipStop)
     if not TargetPlayer or not TargetPlayer.Character then
         notify("Error", "Target not found")
         return
@@ -309,10 +311,15 @@ local function fling(TargetPlayer)
         return
     end
     
-    stopFling()
+    -- Only stop if not part of a sequence
+    if not skipStop then
+        stopFling()
+    end
+    
     flingVars.isFlinging = true
     flingVars.flingTarget = TCharacter
     
+    -- Save collision states
     for _, part in ipairs(Character:GetDescendants()) do
         if part:IsA("BasePart") then
             flingVars.originalCanCollide[part] = part.CanCollide
@@ -330,6 +337,7 @@ local function fling(TargetPlayer)
         return
     end
 
+    -- Set camera target
     if THead then
         Workspace.CurrentCamera.CameraSubject = THead
     elseif Handle then
@@ -344,14 +352,20 @@ local function fling(TargetPlayer)
         return
     end
 
+    -- FPos function
     local function FPos(BasePart, Pos, Ang)
         if not flingVars.isFlinging then return end
-        RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-        Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-        RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        pcall(function()
+            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+            if Character.PrimaryPart then
+                Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+            end
+            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        end)
     end
 
+    -- SFBasePart function
     local function SFBasePart(BasePart)
         local TimeToWait = 2
         local Time = tick()
@@ -360,42 +374,44 @@ local function fling(TargetPlayer)
         repeat
             if not flingVars.isFlinging or not RootPart or not THumanoid then break end
             
-            if BasePart.Velocity.Magnitude < 50 then
-                Angle = Angle + 100
-                FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
-                task.wait()
-            else
-                FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0))
-                task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                task.wait()
-            end
+            pcall(function()
+                if BasePart.Velocity.Magnitude < 50 then
+                    Angle = Angle + 100
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                else
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                end
+            end)
             
             task.wait()
         until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= TargetPlayer.Character or TargetPlayer.Parent ~= Players or not flingVars.isFlinging or THumanoid.Sit or Humanoid.Health <= 0 or tick() > Time + TimeToWait
@@ -442,8 +458,12 @@ local function fling(TargetPlayer)
     if flingVars.OldPos then
         repeat
             if not flingVars.isFlinging then break end
-            RootPart.CFrame = flingVars.OldPos * CFrame.new(0, .5, 0)
-            Character:SetPrimaryPartCFrame(flingVars.OldPos * CFrame.new(0, .5, 0))
+            pcall(function()
+                RootPart.CFrame = flingVars.OldPos * CFrame.new(0, .5, 0)
+                if Character.PrimaryPart then
+                    Character:SetPrimaryPartCFrame(flingVars.OldPos * CFrame.new(0, .5, 0))
+                end
+            end)
             
             task.wait()
         until (RootPart.Position - flingVars.OldPos.p).Magnitude < 25
@@ -478,7 +498,7 @@ local function flingAll()
             local targetPlayer = flingList[i]
             if targetPlayer and targetPlayer.Character then
                 notify("Fling All", string.format("%d/%d: %s", i, #flingList, targetPlayer.Name))
-                fling(targetPlayer)
+                fling(targetPlayer, true) -- skip stopFling inside fling()
                 task.wait(0.5)
             end
         end
@@ -491,7 +511,7 @@ local function flingAll()
     
     notify("Fling All", "Targeting " .. #flingList .. " players")
 end
-    
+
 STEP 8: ELEMENT FACTORIES =============
 local function addToggle(tab, text, default, callback)
     local container = Instance.new("Frame", tab.Content)
