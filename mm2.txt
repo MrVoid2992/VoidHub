@@ -270,7 +270,7 @@ local function stopFling()
         flingVars.flingConnection:Disconnect()
         flingVars.flingConnection = nil
     end
-
+    
     if Char then
         for _, part in ipairs(Char:GetDescendants()) do
             if part:IsA("BasePart") and flingVars.originalCanCollide[part] ~= nil then
@@ -290,7 +290,7 @@ end
 
 local function fling(TargetPlayer)
     if not TargetPlayer or not TargetPlayer.Character then
-        notify("Error", "Target couldn't found")
+        notify("Error", "Target not found")
         return
     end
     
@@ -305,11 +305,10 @@ local function fling(TargetPlayer)
     local Handle = Accessory and Accessory:FindFirstChild("Handle")
 
     if not (Character and Humanoid and RootPart) then
-        notify("Error", "Your character isn't ready.")
+        notify("Error", "Character not ready")
         return
     end
     
-
     stopFling()
     flingVars.isFlinging = true
     flingVars.flingTarget = TCharacter
@@ -326,7 +325,7 @@ local function fling(TargetPlayer)
     end
     
     if THumanoid and THumanoid.Sit then
-        notify("Error", "The target is sitting")
+        notify("Error", "Target is sitting")
         stopFling()
         return
     end
@@ -340,19 +339,22 @@ local function fling(TargetPlayer)
     end
 
     if not TCharacter:FindFirstChildWhichIsA("BasePart") then
-        notify("Error", "Target doesn't has a body")
-           notify("Error", "Target doesn't has a body") -- FPos fonksiyonu
-    local function FPos(
-    local function FPos(BasePart, Pos, Ang) end
+        notify("Error", "Target has no body parts")
+        stopFling()
+        return
+    end
+
+    local function FPos(BasePart, Pos, Ang)
+        if not flingVars.isFlinging then return end
         RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
         Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
         RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
         RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
     end
 
-    -- SFBasePart fonksiyonu
-    local function
-    local function SFBasePart(BasePart) = tick()
+    local function SFBasePart(BasePart)
+        local TimeToWait = 2
+        local Time = tick()
         local Angle = 0
         
         repeat
@@ -424,7 +426,7 @@ local function fling(TargetPlayer)
     elseif not TRootPart and not THead and Handle then
         targetPart = Handle
     else
-        notify("Error", "Targets body parts missing ")
+        notify("Error", "Target body missing")
         stopFling()
         return
     end
@@ -442,44 +444,55 @@ local function fling(TargetPlayer)
             if not flingVars.isFlinging then break end
             RootPart.CFrame = flingVars.OldPos * CFrame.new(0, .5, 0)
             Character:SetPrimaryPartCFrame(flingVars.OldPos * CFrame.new(0, .5, 0))
-            Humanoid:ChangeState("GettingUp")
-            
-            for _, x in ipairs(Character:GetChildren()) do
-                if x:IsA("BasePart") then
-                    x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new()
-                end
-            end
             
             task.wait()
         until (RootPart.Position - flingVars.OldPos.p).Magnitude < 25
     end
     
-OldPos.p).Magnitude < 25sDestroyH    
-    workspace.F()lenPartsDestroyHeight = flingVars.FPDH TargetPlayer.Nam    notify("Fling", "Done: " .. TargetPlayer.Name))
-   
-local function flingAll() _, p in pairs(Players:GetPlayers()) do
+    workspace.FallenPartsDestroyHeight = flingVars.FPDH
+    stopFling()
+    notify("Fling", "Completed: " .. TargetPlayer.Name)
+end
+
+local function flingAll()
+    stopFling()
+    
+    local flingList = {}
+    for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             table.insert(flingList, p)
         end
     end
     
     if #flingList == 0 then
-        notify("Hata", "Fling yapılacak oyuncu yok")
-         notify("Error", "There's no player to fling at")= true
-    local index = 1
+        notify("Error", "No players to fling")
+        return
+    end
     
-    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
-        if not flingVars.isFlinging or #flingList == 0 then return end
-        
-        local targetPlayer = flingList[index]
-        if targetPlayer and targetPlayer.Character then
-            fling(targetPlayer)
+    flingVars.isFlinging = true
+    
+    task.spawn(function()
+        for i = 1, #flingList do
+            if not flingVars.isFlinging then break end
+            
+            local targetPlayer = flingList[i]
+            if targetPlayer and targetPlayer.Character then
+                notify("Fling All", string.format("%d/%d: %s", i, #flingList, targetPlayer.Name))
+                fling(targetPlayer)
+                task.wait(0.5)
+            end
         end
         
-        index = index % #flingList + 1
+        if flingVars.isFlinging then
+            notify("Fling All", "Completed")
+            flingVars.isFlinging = false
+        end
     end)
     
-    notify("Fling All"    notify("Fling All", #flingList .. " player getting targeted") STEP 8: ELEMENT FACTORIES =============
+    notify("Fling All", "Targeting " .. #flingList .. " players")
+end
+    
+STEP 8: ELEMENT FACTORIES =============
 local function addToggle(tab, text, default, callback)
     local container = Instance.new("Frame", tab.Content)
     container.Size = UDim2.new(1, -10, 0, 30)
