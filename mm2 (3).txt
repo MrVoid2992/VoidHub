@@ -251,58 +251,179 @@ function removeEsp()
     espObjects = {}
 end
 
--- ============= STEP 7.5: FLING SYSTEM (COMBAT) =============
-local flingVars = {
-    isFlinging = false,
-    flingTarget = nil,
-    flingPower = 50,
-    flingConnection = nil
-}
-
-local function startFling(targetChar)
-    if flingVars.flingConnection then
-        flingVars.flingConnection:Disconnect()
-    end
-    
-    flingVars.flingTarget = targetChar
-    flingVars.isFlinging = true
-    
-    -- Karakterin çarpışmasını aç
-    for _, part in ipairs(Char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = true
+-- ============= STEP 7.5: NEW FLING SYSTEM (COMBAT) =============
+local function getPlayerByPartialName(name)
+    name = name:lower()
+    if name == "all" or name == "others" then
+        return "all"
+    elseif name == "random" then
+        local players = Players:GetPlayers()
+        if table.find(players, Plr) then
+            table.remove(players, table.find(players, Plr))
         end
-    end
-    
-    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
-        if flingVars.isFlinging and flingVars.flingTarget and flingVars.flingTarget:FindFirstChild("HumanoidRootPart") and HRP then
-            HRP.CFrame = flingVars.flingTarget.HumanoidRootPart.CFrame
-            HRP.Velocity = Vector3.new(
-                math.random(-flingVars.flingPower, flingVars.flingPower),
-                math.random(-flingVars.flingPower, flingVars.flingPower),
-                math.random(-flingVars.flingPower, flingVars.flingPower)
-            )
-        end
-    end)
-end
-
-local function stopFling()
-    flingVars.isFlinging = false
-    flingVars.flingTarget = nil
-    if flingVars.flingConnection then
-        flingVars.flingConnection:Disconnect()
-        flingVars.flingConnection = nil
-    end
-    notify("Fling", "Stopped")
-end
-
-local function getPlayerByName(name)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name:lower():sub(1, #name:lower()) == name:lower() and player ~= Plr then
-            return player
+        return #players > 0 and players[math.random(#players)] or nil
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= Plr then
+                if player.Name:lower():match("^"..name) or player.DisplayName:lower():match("^"..name) then
+                    return player
+                end
+            end
         end
     end
     return nil
+end
+
+local function fling(targetPlayer, allPlayers)
+    if not targetPlayer or not targetPlayer.Character then
+        notify("Error", "Invalid target")
+        return
+    end
+    
+    local Character = Plr.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+    
+    if not RootPart then return end
+    
+    local TChar = targetPlayer.Character
+    local THumanoid = TChar:FindFirstChildOfClass("Humanoid")
+    local TRootPart = THumanoid and THumanoid.RootPart
+    local THead = TChar:FindFirstChild("Head")
+    local Accessory = TChar:FindFirstChildOfClass("Accessory")
+    local Handle = Accessory and Accessory:FindFirstChild("Handle")
+    
+    if not (Character and Humanoid and RootPart) then
+        notify("Error", "Your character is not ready")
+        return
+    end
+    
+    -- Save original state
+    local originalPos = RootPart.CFrame
+    local originalCameraSubject = workspace.CurrentCamera.CameraSubject
+    local originalFallHeight = workspace.FallenPartsDestroyHeight
+    
+    -- Check if target is sitting
+    if THumanoid and THumanoid.Sit and not allPlayers then
+        notify("Error", "Target is sitting")
+        return
+    end
+    
+    -- Set camera to target
+    if THead then
+        workspace.CurrentCamera.CameraSubject = THead
+    elseif Handle then
+        workspace.CurrentCamera.CameraSubject = Handle
+    elseif THumanoid then
+        workspace.CurrentCamera.CameraSubject = THumanoid
+    end
+    
+    if not TChar:FindFirstChildWhichIsA("BasePart") then
+        notify("Error", "Target has no valid parts")
+        return
+    end
+    
+    -- Position and rotation function
+    local function updatePosition(basePart, offset, rotation)
+        RootPart.CFrame = CFrame.new(basePart.Position) * offset * rotation
+        Character:SetPrimaryPartCFrame(CFrame.new(basePart.Position) * offset * rotation)
+        RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
+        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+    end
+    
+    -- Main fling function
+    local function performFling(basePart)
+        local startTime = tick()
+        local angle = 0
+        
+        while tick() - startTime < 2 and targetPlayer.Parent and TChar.Parent do
+            angle = angle + 100
+            
+            if basePart.Velocity.Magnitude < 50 then
+                -- Low velocity fling pattern
+                updatePosition(basePart, CFrame.new(0, 1.5, 0) + (THumanoid and THumanoid.MoveDirection * basePart.Velocity.Magnitude / 1.25 or Vector3.zero), CFrame.Angles(math.rad(angle), 0, 0))
+                task.wait()
+                updatePosition(basePart, CFrame.new(0, -1.5, 0) + (THumanoid and THumanoid.MoveDirection * basePart.Velocity.Magnitude / 1.25 or Vector3.zero), CFrame.Angles(math.rad(angle), 0, 0))
+                task.wait()
+                updatePosition(basePart, CFrame.new(2.25, 1.5, -2.25) + (THumanoid and THumanoid.MoveDirection * basePart.Velocity.Magnitude / 1.25 or Vector3.zero), CFrame.Angles(math.rad(angle), 0, 0))
+                task.wait()
+                updatePosition(basePart, CFrame.new(-2.25, -1.5, 2.25) + (THumanoid and THumanoid.MoveDirection * basePart.Velocity.Magnitude / 1.25 or Vector3.zero), CFrame.Angles(math.rad(angle), 0, 0))
+                task.wait()
+            else
+                -- High velocity fling pattern
+                updatePosition(basePart, CFrame.new(0, 1.5, THumanoid and THumanoid.WalkSpeed or 16), CFrame.Angles(math.rad(90), 0, 0))
+                task.wait()
+                updatePosition(basePart, CFrame.new(0, -1.5, -(THumanoid and THumanoid.WalkSpeed or 16)), CFrame.Angles(0, 0, 0))
+                task.wait()
+            end
+            
+            -- Break conditions
+            if basePart.Velocity.Magnitude > 500 or 
+               basePart.Parent ~= TChar or 
+               targetPlayer.Parent ~= Players or 
+               (THumanoid and THumanoid.Sit) or 
+               Humanoid.Health <= 0 or 
+               tick() > startTime + 2 then
+                break
+            end
+        end
+    end
+    
+    -- Prepare fling
+    workspace.FallenPartsDestroyHeight = 0/0
+    
+    local BV = Instance.new("BodyVelocity")
+    BV.Name = "FlingVelocity"
+    BV.Parent = RootPart
+    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+    
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    
+    -- Choose target part
+    local targetPart = TRootPart
+    if TRootPart and THead and (TRootPart.Position - THead.Position).Magnitude > 5 then
+        targetPart = THead
+    elseif not TRootPart and THead then
+        targetPart = THead
+    elseif not TRootPart and not THead and Handle then
+        targetPart = Handle
+    end
+    
+    if not targetPart then
+        notify("Error", "No valid target part found")
+        BV:Destroy()
+        return
+    end
+    
+    -- Execute fling
+    performFling(targetPart)
+    
+    -- Cleanup
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    workspace.CurrentCamera.CameraSubject = Humanoid
+    
+    -- Return to position
+    local returnStart = tick()
+    repeat
+        RootPart.CFrame = originalPos * CFrame.new(0, 0.5, 0)
+        Char:SetPrimaryPartCFrame(originalPos * CFrame.new(0, 0.5, 0))
+        Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.Velocity = Vector3.new()
+                part.RotVelocity = Vector3.new()
+            end
+        end
+        
+        task.wait()
+    until (RootPart.Position - originalPos.Position).Magnitude < 25 or tick() - returnStart > 3
+    
+    workspace.FallenPartsDestroyHeight = originalFallHeight
+    
+    notify("Fling", "Completed fling on " .. targetPlayer.Name)
 end
 
 -- ============= STEP 8: ELEMENT FACTORIES =============
@@ -621,33 +742,30 @@ addButton(tabs[4], "TP to Lobby", function()
     end
 end)
 
--- **COMBAT** (6 elements - FIXED)
+-- **COMBAT** (5 elements)
 local flingTargetName = ""
 
-addDropdown(tabs[5], "Target Player", 
+addDropdown(tabs[5], "Fling Target", 
     (function()
-        local list = {}
-        for _, p in pairs(Players:GetPlayers()) do if p ~= Plr then table.insert(list, p.Name) end end
-        return #list > 0 and list or {"None"}
+        local list = {"None"}
+        for _, p in pairs(Players:GetPlayers()) do 
+            if p ~= Plr then 
+                table.insert(list, p.Name) 
+            end 
+        end
+        return #list > 1 and list or {"None"}
     end)(),
     function(val)
         flingTargetName = val
     end)
 
-addSlider(tabs[5], "Fling Power", 10, 200, 50, function(val)
-    flingVars.flingPower = val
-    notify("Fling Power", "Set to: " .. val)
-end)
-
-addButton(tabs[5], "Fling Player", function()
+addButton(tabs[5], "Fling Selected", function()
     if flingTargetName and flingTargetName ~= "None" then
-        local target = getPlayerByName(flingTargetName)
-        if target and target.Character then
-            stopFling()
-            startFling(target.Character)
-            notify("Fling", "Started: "..target.Name)
+        local target = getPlayerByPartialName(flingTargetName)
+        if target and target ~= "all" then
+            fling(target, false)
         else
-            notify("Error", "Target not found")
+            notify("Error", "Invalid target")
         end
     else
         notify("Error", "No player selected")
@@ -657,72 +775,41 @@ end)
 addButton(tabs[5], "Fling Murderer", function()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
-            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                stopFling()
-                startFling(p.Character)
-                notify("Fling", "Flinging Murderer: "..p.Name)
-                return
-            end
+            fling(p, false)
+            return
         end
     end
-    notify("Not Found", "No Murderer")
+    notify("Not Found", "No murderer")
 end)
 
 addButton(tabs[5], "Fling Sheriff", function()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
-            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                stopFling()
-                startFling(p.Character)
-                notify("Fling", "Flinging Sheriff: "..p.Name)
-                return
-            end
+            fling(p, false)
+            return
         end
     end
-    notify("Not Found", "No Sheriff")
+    notify("Not Found", "No sheriff")
 end)
 
-addButton(tabs[5], "Fling All", function()
-    stopFling()
-    local flingList = {}
+addButton(tabs[5], "Fling Everyone", function()
+    local flingCount = 0
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(flingList, p.Character)
+        if p ~= Plr and p.Character then
+            task.spawn(function()
+                fling(p, true)
+            end)
+            flingCount = flingCount + 1
         end
     end
-    
-    if #flingList == 0 then
+    if flingCount > 0 then
+        notify("Fling All", "Flinging " .. flingCount .. " players!")
+    else
         notify("Error", "No players to fling")
-        return
     end
-    
-    flingVars.isFlinging = true
-    local index = 1
-    
-    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
-        if not flingVars.isFlinging or #flingList == 0 then return end
-        
-        local targetChar = flingList[index]
-        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") and HRP then
-            HRP.CFrame = targetChar.HumanoidRootPart.CFrame
-            HRP.Velocity = Vector3.new(
-                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
-                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
-                math.random(-flingVars.flingPower*2, flingVars.flingPower*2)
-            )
-        end
-        
-        index = index % #flingList + 1
-    end)
-    
-    notify("Fling All", "Flinging " .. #flingList .. " players!")
 end)
 
-addButton(tabs[5], "Stop Fling", function()
-    stopFling()
-end)
-
-addLabel(tabs[6], "Status: Idle")
+addLabel(tabs[5], "Fling System: Active | Enhanced")
 
 
 -- **SETTINGS** (5 elements)
