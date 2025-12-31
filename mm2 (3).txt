@@ -1,0 +1,901 @@
+-- ============= STEP 0: SECURITY CHECK =============
+if game.PlaceId ~= 142823291 then return end
+
+-- ============= STEP 1: SERVICES & VARIABLES =============
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+
+local Plr = Players.LocalPlayer
+local Char = Plr.Character or Plr.CharacterAdded:Wait()
+local HRP = Char:WaitForChild("HumanoidRootPart")
+local Hum = Char:WaitForChild("Humanoid")
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- ============= STEP 2: CONFIGURATION =============
+local CONFIG = {
+    COIN_TYPE = "SnowToken",
+    AUTO_FARM = false,
+    ESP_ENABLED = false,
+    AFK_ENABLED = true,
+    MAX_SPEED = 50,
+    UI_OPEN = true,
+    TP_DISTANCE = 75
+}
+
+-- ============= STEP 3: MOBILE TOGGLE BUTTON (VISIBLE WHEN GUI CLOSED) =============
+local mobileBtn = Instance.new("TextButton")
+mobileBtn.Name = "VOID_HUB_TOGGLE"
+mobileBtn.Size = UDim2.new(0, 60, 0, 60)
+mobileBtn.Position = UDim2.new(1, -70, 1, -70)
+mobileBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+mobileBtn.BackgroundTransparency = 0.2
+mobileBtn.Text = "VOID"
+mobileBtn.TextColor3 = Color3.new(1, 1, 1)
+mobileBtn.TextScaled = true
+mobileBtn.Font = Enum.Font.GothamBold
+mobileBtn.ZIndex = 999
+mobileBtn.Visible = true -- ✅ Initially visible
+mobileBtn.Parent = game.CoreGui
+
+Instance.new("UICorner", mobileBtn).CornerRadius = UDim.new(0, 30)
+
+local mobStroke = Instance.new("UIStroke", mobileBtn)
+mobStroke.Color = Color3.new(1, 1, 1)
+mobStroke.Thickness = 2
+
+-- Heartbeat persistence
+task.spawn(function()
+    while true do
+        if mobileBtn.Parent ~= game.CoreGui then mobileBtn.Parent = game.CoreGui end
+        task.wait(2)
+    end
+end)
+
+-- ============= STEP 4: NOTIFICATION SYSTEM =============
+function notify(title, message)
+    local sg = Instance.new("ScreenGui")
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0, 250, 0, 70)
+    main.Position = UDim2.new(1, -260, 1, -80)
+    main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    main.BackgroundTransparency = 0.3
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+    
+    local stroke = Instance.new("UIStroke", main)
+    stroke.Color = Color3.fromRGB(100, 0, 255)
+    stroke.Thickness = 2
+    
+    local t = Instance.new("TextLabel", main)
+    t.Size = UDim2.new(1, 0, 0, 20)
+    t.BackgroundTransparency = 1
+    t.Text = title
+    t.TextColor3 = Color3.fromRGB(100, 0, 255)
+    t.TextSize = 14
+    t.Font = Enum.Font.GothamBold
+    
+    local m = Instance.new("TextLabel", main)
+    m.Size = UDim2.new(1, 0, 1, -20)
+    m.Position = UDim2.new(0, 0, 0, 20)
+    m.BackgroundTransparency = 1
+    m.Text = message
+    m.TextColor3 = Color3.new(1, 1, 1)
+    m.TextSize = 12
+    m.TextWrapped = true
+    m.Font = Enum.Font.Gotham
+    
+    sg.Parent = game.CoreGui
+    task.wait(3)
+    sg:Destroy()
+end
+
+-- ============= STEP 5: MAIN GUI =============
+local sg = Instance.new("ScreenGui")
+sg.Name = "VoidHubMM2"
+sg.ResetOnSpawn = false
+sg.Parent = game.CoreGui
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 420, 0, 320)
+main.Position = UDim2.new(0.5, -210, 0.5, -160)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.BackgroundTransparency = 0.3
+main.BorderSizePixel = 0
+main.Visible = true
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", main).Color = Color3.fromRGB(100, 0, 255)
+Instance.new("UIStroke", main).Thickness = 2
+
+-- Top Bar
+local topBar = Instance.new("Frame", main)
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+topBar.BackgroundTransparency = 0.5
+
+local title = Instance.new("TextLabel", topBar)
+title.Size = UDim2.new(1, -30, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "VOID HUB ~ MM2"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 14
+title.Font = Enum.Font.GothamBold
+
+local closeBtn = Instance.new("TextButton", topBar)
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -25, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+
+-- Tab Bar
+local tabBar = Instance.new("Frame", main)
+tabBar.Size = UDim2.new(0, 90, 1, -30)
+tabBar.Position = UDim2.new(0, 0, 0, 30)
+tabBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tabBar.BackgroundTransparency = 0.4
+
+-- Content
+local content = Instance.new("Frame", main)
+content.Size = UDim2.new(1, -90, 1, -30)
+content.Position = UDim2.new(0, 90, 0, 30)
+content.BackgroundTransparency = 1
+
+-- ============= STEP 6: 6 TABS (SCROLLABLE) =============
+local tabs = {}
+local tabNames = {"FARM", "ESP", "PLAYER", "TP", "COMBAT", "SETTINGS"}
+
+
+for i, name in ipairs(tabNames) do
+    local tab = {}
+    
+    tab.Button = Instance.new("TextButton", tabBar)
+    tab.Button.Size = UDim2.new(1, 0, 0, 32)
+    tab.Button.Position = UDim2.new(0, 0, 0, (i-1)*32)
+    tab.Button.BackgroundTransparency = 1
+    tab.Button.Text = name
+    tab.Button.TextColor3 = (i == 1) and Color3.fromRGB(100, 0, 255) or Color3.fromRGB(180, 180, 180)
+    tab.Button.TextSize = 11
+    tab.Button.Font = Enum.Font.Gotham
+    
+    tab.Content = Instance.new("ScrollingFrame", content)
+    tab.Content.Name = name
+    tab.Content.Size = UDim2.new(1, 0, 1, 0)
+    tab.Content.BackgroundTransparency = 1
+    tab.Content.ScrollBarThickness = 3
+    tab.Content.ScrollBarImageColor3 = Color3.fromRGB(100, 0, 255)
+    tab.Content.Visible = (i == 1)
+    tab.Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
+    local layout = Instance.new("UIListLayout", tab.Content)
+    layout.Padding = UDim.new(0, 5)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        tab.Content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    end)
+    
+    table.insert(tabs, tab)
+    
+    tab.Button.MouseButton1Click:Connect(function()
+        for _, t in pairs(tabs) do
+            t.Content.Visible = false
+            t.Button.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+        tab.Content.Visible = true
+        tab.Button.TextColor3 = Color3.fromRGB(100, 0, 255)
+    end)
+end
+
+-- ============= STEP 7: ESP SYSTEM =============
+local espObjects = {}
+
+function updateEsp()
+    for _, obj in pairs(espObjects) do
+        if obj.player and obj.player.Character and obj.highlight then
+            local color = Color3.fromRGB(0, 255, 0)
+            if obj.player.Backpack:FindFirstChild("Knife") or obj.player.Character:FindFirstChild("Knife") then
+                color = Color3.fromRGB(255, 0, 0)
+            elseif obj.player.Backpack:FindFirstChild("Gun") or obj.player.Character:FindFirstChild("Gun") then
+                color = Color3.fromRGB(0, 85, 255)
+            end
+            obj.highlight.FillColor = color
+        end
+    end
+end
+
+function createEsp()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Plr and player.Character and not player.Character:FindFirstChild("EspHighlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "EspHighlight"
+            highlight.Parent = player.Character
+            highlight.FillTransparency = 0.6
+            highlight.OutlineTransparency = 0.3
+            
+            local billboard = Instance.new("BillboardGui")
+            billboard.Parent = player.Character:WaitForChild("HumanoidRootPart")
+            billboard.Size = UDim2.new(0, 100, 0, 25)
+            billboard.AlwaysOnTop = true
+            billboard.MaxDistance = 500
+            
+            local text = Instance.new("TextLabel", billboard)
+            text.Size = UDim2.new(1, 0, 1, 0)
+            text.BackgroundTransparency = 0.5
+            text.BackgroundColor3 = Color3.new(0, 0, 0)
+            text.TextColor3 = Color3.new(1, 1, 1)
+            text.TextScaled = true
+            text.Text = player.Name
+            
+            table.insert(espObjects, {highlight = highlight, billboard = billboard, player = player})
+        end
+    end
+    updateEsp()
+end
+
+function removeEsp()
+    for _, obj in pairs(espObjects) do
+        if obj.highlight then obj.highlight:Destroy() end
+        if obj.billboard then obj.billboard:Destroy() end
+    end
+    espObjects = {}
+end
+
+-- ============= STEP 7.5: FLING SYSTEM (COMBAT) =============
+local flingVars = {
+    isFlinging = false,
+    flingTarget = nil,
+    flingPower = 50,
+    flingConnection = nil
+}
+
+local function startFling(targetChar)
+    if flingVars.flingConnection then
+        flingVars.flingConnection:Disconnect()
+    end
+    
+    flingVars.flingTarget = targetChar
+    flingVars.isFlinging = true
+    
+    -- Karakterin çarpışmasını aç
+    for _, part in ipairs(Char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+    
+    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
+        if flingVars.isFlinging and flingVars.flingTarget and flingVars.flingTarget:FindFirstChild("HumanoidRootPart") and HRP then
+            HRP.CFrame = flingVars.flingTarget.HumanoidRootPart.CFrame
+            HRP.Velocity = Vector3.new(
+                math.random(-flingVars.flingPower, flingVars.flingPower),
+                math.random(-flingVars.flingPower, flingVars.flingPower),
+                math.random(-flingVars.flingPower, flingVars.flingPower)
+            )
+        end
+    end)
+end
+
+local function stopFling()
+    flingVars.isFlinging = false
+    flingVars.flingTarget = nil
+    if flingVars.flingConnection then
+        flingVars.flingConnection:Disconnect()
+        flingVars.flingConnection = nil
+    end
+    notify("Fling", "Stopped")
+end
+
+local function getPlayerByName(name)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():sub(1, #name:lower()) == name:lower() and player ~= Plr then
+            return player
+        end
+    end
+    return nil
+end
+
+-- ============= STEP 8: ELEMENT FACTORIES =============
+local function addToggle(tab, text, default, callback)
+    local container = Instance.new("Frame", tab.Content)
+    container.Size = UDim2.new(1, -10, 0, 30)
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BackgroundTransparency = 0.4
+    container.LayoutOrder = #tab.Content:GetChildren() * 10
+    
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 10
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggle = Instance.new("Frame", container)
+    toggle.Size = UDim2.new(0, 35, 0, 18)
+    toggle.Position = UDim2.new(1, -40, 0, 6)
+    toggle.BackgroundColor3 = default and Color3.fromRGB(100, 0, 255) or Color3.fromRGB(60, 60, 60)
+    
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 9)
+    
+    local knob = Instance.new("Frame", toggle)
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.Position = default and UDim2.new(1, -16, 0, 2) or UDim2.new(0, 2, 0, 2)
+    knob.BackgroundColor3 = Color3.new(1, 1, 1)
+    
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 7)
+    
+    local state = default
+    container.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            toggle.BackgroundColor3 = state and Color3.fromRGB(100, 0, 255) or Color3.fromRGB(60, 60, 60)
+            knob.Position = state and UDim2.new(1, -16, 0, 2) or UDim2.new(0, 2, 0, 2)
+            callback(state)
+        end
+    end)
+end
+
+local function addSlider(tab, text, min, max, default, callback)
+    local container = Instance.new("Frame", tab.Content)
+    container.Size = UDim2.new(1, -10, 0, 45)
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BackgroundTransparency = 0.4
+    container.LayoutOrder = #tab.Content:GetChildren() * 10
+    
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(1, -10, 0, 15)
+    label.Position = UDim2.new(0, 5, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. default
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 11
+    label.Font = Enum.Font.Gotham
+    
+    local track = Instance.new("Frame", container)
+    track.Size = UDim2.new(1, -10, 0, 5)
+    track.Position = UDim2.new(0, 5, 0, 25)
+    track.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    
+    local fill = Instance.new("Frame", track)
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+    
+    local handle = Instance.new("TextButton", track)
+    handle.Size = UDim2.new(0, 12, 0, 20)
+    handle.Position = UDim2.new((default - min) / (max - min), -6, 0, -7)
+    handle.BackgroundColor3 = Color3.new(1, 1, 1)
+    handle.Text = ""
+    
+    Instance.new("UICorner", track).CornerRadius = UDim.new(0, 2)
+    Instance.new("UICorner", handle).CornerRadius = UDim.new(0, 2)
+    
+    local dragging = false
+    local value = default
+    
+    local function update(pos)
+        local relative = math.clamp((pos - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+        value = math.floor(min + (max - min) * relative + 0.5)
+        handle.Position = UDim2.new(relative, -6, 0, -7)
+        fill.Size = UDim2.new(relative, 0, 1, 0)
+        label.Text = text .. ": " .. value
+        callback(value)
+    end
+    
+    handle.MouseButton1Down:Connect(function() dragging = true end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                        input.UserInputType == Enum.UserInputType.Touch) then
+            update(input.Position.X)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            update(input.Position.X)
+        end
+    end)
+end
+
+local function addButton(tab, text, callback)
+    local btn = Instance.new("TextButton", tab.Content)
+    btn.Size = UDim2.new(1, -10, 0, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.BackgroundTransparency = 0.4
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.Gotham
+    btn.LayoutOrder = #tab.Content:GetChildren() * 10
+    
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+        callback()
+        wait(0.2)
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
+end
+
+local function addDropdown(tab, text, values, callback)
+    local container = Instance.new("Frame", tab.Content)
+    container.Size = UDim2.new(1, -10, 0, 35)
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BackgroundTransparency = 0.4
+    container.LayoutOrder = #tab.Content:GetChildren() * 10
+    
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = text .. ": " .. values[1]
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.Gotham
+    
+    local current = 1
+    btn.MouseButton1Click:Connect(function()
+        current = current % #values + 1
+        btn.Text = text .. ": " .. values[current]
+        callback(values[current])
+    end)
+end
+
+local function addLabel(tab, text)
+    local label = Instance.new("TextLabel", tab.Content)
+    label.Size = UDim2.new(1, -10, 0, 40)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label.TextSize = 10
+    label.TextWrapped = true
+    label.Font = Enum.Font.Gotham
+    label.LayoutOrder = #tab.Content:GetChildren() * 10
+end
+
+-- ============= STEP 9: POPULATE ALL 5 TABS (UNCHANGED) =============
+
+-- **FARM** (5 elements)
+addToggle(tabs[1], "Auto Farm", false, function(state)
+    CONFIG.AUTO_FARM = state
+    farming = state
+    if state then startPos = HRP.CFrame end
+    notify("Farm", state and "ON" or "OFF")
+end)
+
+addSlider(tabs[1], "Speed", 5, CONFIG.MAX_SPEED, 25, function(val)
+    CONFIG.MAX_SPEED = val
+end)
+
+addDropdown(tabs[1], "Coin", {"SnowToken", "Egg", "Coin", "Candy"}, function(val)
+    CONFIG.COIN_TYPE = val
+    notify("Coin", "Set to: " .. val)
+end)
+
+addButton(tabs[1], "Farm Status", function()
+    notify("Status", CONFIG.AUTO_FARM and "ON" or "OFF")
+end)
+
+addLabel(tabs[1], "Collected: 0 | Max: " .. CONFIG.MAX_SPEED)
+
+-- **ESP** (5 elements)
+addToggle(tabs[2], "Show ESP", false, function(state)
+    CONFIG.ESP_ENABLED = state
+    if state then createEsp() else removeEsp() end
+    notify("ESP", state and "ON" or "OFF")
+end)
+
+addButton(tabs[2], "Find Murderer", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
+            notify("Murderer", p.Name)
+            return
+        end
+    end
+    notify("Not Found", "No murderer")
+end)
+
+addButton(tabs[2], "Find Sheriff", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
+            notify("Sheriff", p.Name)
+            return
+        end
+    end
+    notify("Not Found", "No sheriff")
+end)
+
+addButton(tabs[2], "Force Update", function()
+    if CONFIG.ESP_ENABLED then updateEsp() end
+end)
+
+addLabel(tabs[2], "Players: " .. #Players:GetPlayers())
+
+-- **PLAYER** (5 elements - **FLY REMOVED**)
+addSlider(tabs[3], "WalkSpeed", 20, 200, Hum.WalkSpeed, function(val)
+    Hum.WalkSpeed = val
+    notify("Speed", "WalkSpeed: " .. val)
+end)
+
+addSlider(tabs[3], "JumpPower", 50, 200, Hum.JumpPower, function(val)
+    Hum.JumpPower = val
+    notify("Jump", "JumpPower: " .. val)
+end)
+
+addButton(tabs[3], "God Mode", function()
+    Hum.MaxHealth = 9e9
+    Hum.Health = 9e9
+    notify("God Mode", "Health set to 9e9")
+end)
+
+-- ✅ FIXED RESET BUTTON
+addButton(tabs[3], "Reset", function()
+    -- ✅ DÜZELTİLMİŞ RESET (GARANTİ ÇALIŞIR)
+    local currentChar = Plr.Character
+    if currentChar then
+        local currentHum = currentChar:FindFirstChildOfClass("Humanoid")
+        if currentHum then
+            currentHum.Health = 0
+            notify("Reset", "Character resetting...")
+        end
+    end
+end)
+
+-- **TELEPORT** (5 elements)
+local selectedPlayer = nil
+
+addDropdown(tabs[4], "Target", 
+    (function()
+        local list = {}
+        for _, p in pairs(Players:GetPlayers()) do if p ~= Plr then table.insert(list, p.Name) end end
+        return #list > 0 and list or {"None"}
+    end)(),
+    function(val)
+        selectedPlayer = val
+    end)
+
+addButton(tabs[4], "TP to Player", function()
+    if selectedPlayer and selectedPlayer ~= "None" then
+        local target = Players:FindFirstChild(selectedPlayer)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            HRP.CFrame = target.Character.HumanoidRootPart.CFrame
+            notify("TP", "Teleported to " .. target.Name)
+        else
+            notify("Error", "Target not found")
+        end
+    else
+        notify("Error", "No player selected")
+    end
+end)
+
+addButton(tabs[4], "TP to Sheriff", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
+            HRP.CFrame = p.Character.HumanoidRootPart.CFrame
+            notify("TP", "Sheriff: " .. p.Name)
+            return
+        end
+    end
+    notify("Not Found", "No sheriff")
+end)
+
+addButton(tabs[4], "TP to Murderer", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
+            HRP.CFrame = p.Character.HumanoidRootPart.CFrame
+            notify("TP", "Murderer: " .. p.Name)
+            return
+        end
+    end
+    notify("Not Found", "No murderer")
+end)
+
+addButton(tabs[4], "TP to Lobby", function()
+    local lobby = Workspace:FindFirstChild("Lobby")
+    if lobby and lobby:FindFirstChild("Spawns") and #lobby.Spawns:GetChildren() > 0 then
+        HRP.CFrame = lobby.Spawns:GetChildren()[1].CFrame
+        notify("TP", "Lobby")
+    else
+        notify("Error", "No lobby found")
+    end
+end)
+
+-- **COMBAT** (6 elements - FIXED)
+local flingTargetName = ""
+
+addDropdown(tabs[5], "Target Player", 
+    (function()
+        local list = {}
+        for _, p in pairs(Players:GetPlayers()) do if p ~= Plr then table.insert(list, p.Name) end end
+        return #list > 0 and list or {"None"}
+    end)(),
+    function(val)
+        flingTargetName = val
+    end)
+
+addSlider(tabs[5], "Fling Power", 10, 200, 50, function(val)
+    flingVars.flingPower = val
+    notify("Fling Power", "Set to: " .. val)
+end)
+
+addButton(tabs[5], "Fling Player", function()
+    if flingTargetName and flingTargetName ~= "None" then
+        local target = getPlayerByName(flingTargetName)
+        if target and target.Character then
+            stopFling()
+            startFling(target.Character)
+            notify("Fling", "Started: "..target.Name)
+        else
+            notify("Error", "Target not found")
+        end
+    else
+        notify("Error", "No player selected")
+    end
+end)
+
+addButton(tabs[5], "Fling Murderer", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife")) then
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                stopFling()
+                startFling(p.Character)
+                notify("Fling", "Flinging Murderer: "..p.Name)
+                return
+            end
+        end
+    end
+    notify("Not Found", "No Murderer")
+end)
+
+addButton(tabs[5], "Fling Sheriff", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and (p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun")) then
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                stopFling()
+                startFling(p.Character)
+                notify("Fling", "Flinging Sheriff: "..p.Name)
+                return
+            end
+        end
+    end
+    notify("Not Found", "No Sheriff")
+end)
+
+addButton(tabs[5], "Fling All", function()
+    stopFling()
+    local flingList = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(flingList, p.Character)
+        end
+    end
+    
+    if #flingList == 0 then
+        notify("Error", "No players to fling")
+        return
+    end
+    
+    flingVars.isFlinging = true
+    local index = 1
+    
+    flingVars.flingConnection = RunService.Heartbeat:Connect(function()
+        if not flingVars.isFlinging or #flingList == 0 then return end
+        
+        local targetChar = flingList[index]
+        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") and HRP then
+            HRP.CFrame = targetChar.HumanoidRootPart.CFrame
+            HRP.Velocity = Vector3.new(
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2),
+                math.random(-flingVars.flingPower*2, flingVars.flingPower*2)
+            )
+        end
+        
+        index = index % #flingList + 1
+    end)
+    
+    notify("Fling All", "Flinging " .. #flingList .. " players!")
+end)
+
+addButton(tabs[5], "Stop Fling", function()
+    stopFling()
+end)
+
+addLabel(tabs[6], "Status: Idle")
+
+
+-- **SETTINGS** (5 elements)
+addButton(tabs[6], "Rejoin Server", function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+end)
+
+addButton(tabs[6], "Copy Job ID", function()
+    setclipboard(game.JobId)
+    notify("Copied", "Job ID copied")
+end)
+
+addButton(tabs[6], "Copy TP Code", function()
+    setclipboard('game:GetService("TeleportService"):TeleportToPlaceInstance(' .. game.PlaceId .. ', "' .. game.JobId .. '", game.Players.LocalPlayer)')
+    notify("Copied", "TP Code")
+end)
+
+addToggle(tabs[6], "Anti-AFK", true, function(state)
+    CONFIG.AFK_ENABLED = state
+    notify("AFK", state and "ON" or "OFF")
+end)
+
+addLabel(tabs[6], "Speed: " .. CONFIG.MAX_SPEED .. " | Mobile: " .. tostring(isMobile) .. "\nDrag from top bar")
+
+-- ============= STEP 10: DRAGGING SYSTEM =============
+local isDragging = false
+local dragStart, startPos
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                      input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, 
+                                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = false
+    end
+end)
+
+-- ============= STEP 11: CLOSE/TOGGLE (FIXED) =============
+closeBtn.MouseButton1Click:Connect(function()
+    main.Visible = false
+    mobileBtn.Visible = true -- ✅ SHOW when GUI closed
+    CONFIG.UI_OPEN = false
+end)
+
+mobileBtn.MouseButton1Click:Connect(function()
+    main.Visible = not main.Visible
+    mobileBtn.Visible = false -- ✅ HIDE when GUI opened
+    CONFIG.UI_OPEN = main.Visible
+end)
+
+-- ============= STEP 12: GAME LOGIC =============
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Gameplay = Remotes:WaitForChild("Gameplay")
+local CoinCollected = Gameplay:WaitForChild("CoinCollected")
+
+Plr.Idled:Connect(function()
+    if CONFIG.AFK_ENABLED then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+    end
+end)
+
+CoinCollected.OnClientEvent:Connect(function(coin_type, current, max)
+    if coin_type == CONFIG.COIN_TYPE and current >= max then
+        bag_full = true
+        farming = false
+        HRP.CFrame = startPos
+        task.wait(2)
+        Hum:TakeDamage(100)
+        task.wait(5)
+        bag_full = false
+    end
+end)
+
+Plr.CharacterAdded:Connect(function(newChar)
+    Char = newChar
+    HRP = newChar:WaitForChild("HumanoidRootPart")
+    Hum = newChar:WaitForChild("Humanoid")
+    stopFling()
+end)
+
+
+-- ============= STEP 13: FARM LOOP (ROBUST) =============
+local farming = false
+local bag_full = false
+local startPos = HRP.CFrame
+
+function getNearestCoin()
+    local closest, minDist = nil, math.huge
+    for _, model in pairs(Workspace:GetChildren()) do
+        if model:FindFirstChild("CoinContainer") then
+            for _, coin in pairs(model.CoinContainer:GetChildren()) do
+                if coin:GetAttribute("CoinID") == CONFIG.COIN_TYPE and coin:FindFirstChild("TouchInterest") then
+                    local dist = (HRP.Position - coin.Position).Magnitude
+                    if dist < minDist then
+                        closest, minDist = coin, dist
+                    end
+                end
+            end
+        end
+    end
+    return closest, minDist
+end
+
+function tweenTo(position, duration)
+    local tween = TweenService:Create(HRP, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = position})
+    tween:Play()
+    return tween
+end
+
+-- ✅ FIXED AUTO FARM LOOP - WON'T STOP RANDOMLY
+task.spawn(function()
+    while true do
+        if CONFIG.AUTO_FARM and not bag_full then
+            local coin, dist = getNearestCoin()
+            if coin and coin:FindFirstChild("TouchInterest") then
+                -- Safely get current character references
+                local currentHRP = HRP
+                local currentHumanoid = Hum
+                
+                if currentHRP and coin then
+                    if dist > 120 then
+                        -- Far distance: Direct teleport
+                        currentHRP.CFrame = coin.CFrame * CFrame.new(0, 0, -5)
+                    else
+                        -- Close distance: Tween
+                        local speed = CONFIG.MAX_SPEED * (0.9 + math.random()/5)
+                        local tween = tweenTo(coin.CFrame, dist / speed)
+                        local startTime = tick()
+                        
+                        -- Wait for coin collection or timeout
+                        while coin:FindFirstChild("TouchInterest") and CONFIG.AUTO_FARM do
+                            task.wait(0.1)
+                            -- Timeout after 10 seconds to prevent infinite loop
+                            if tick() - startTime > 10 then break end
+                        end
+                        
+                        if tween then
+                            tween:Cancel()
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- ============= STEP 14: ESP LOOP =============
+task.spawn(function()
+    while true do
+        if CONFIG.ESP_ENABLED then
+            updateEsp()
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- ============= STEP 15: INITIALIZATION =============
+notify("✅ LOADED", "Combat category have been added! | Fling: Player/Murderer/Sheriff/All", 3)
+print(string.format("✅ VOID HUB ~ MM2 v4.0 | Combat: READY | Speed: %d", CONFIG.MAX_SPEED))
